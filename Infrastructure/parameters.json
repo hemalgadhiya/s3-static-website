@@ -1,0 +1,26 @@
+[
+    {
+      "ParameterKey": "artifactsBucket",
+      "ParameterValue": "s3-codedeploy-artifacts"
+    }, 
+    {
+      "ParameterKey": "codepipelineRoleName",
+      "ParameterValue": "AWSCodePipelineServiceRole-us-east-1-s3-static-website"
+    },
+    {
+        "ParameterKey": "repoBranch",
+        "ParameterValue": "master"
+    },
+    {
+        "ParameterKey": "codecommitrepo",
+        "ParameterValue": "s3-static-website"
+    },
+    {
+        "ParameterKey": "s3staticbucket",
+        "ParameterValue": "hgadhiya.me"
+    },
+    {
+        "ParameterKey": "AppPipeline",
+        "ParameterValue": "mypipeline"
+    }
+]

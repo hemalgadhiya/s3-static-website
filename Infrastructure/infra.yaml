@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates infrastructure for s3 static website hosting
+Parameters:
+    artifactsBucket:
+        Type: String
+        Description: S3 bucket name for storing code pipeline artifacts
+    codepipelineRoleName:
+        Type: String
+        Description: The Name of the codedeploy service role
+    codecommitrepo:
+        Type: String
+        Description: The Name of the code commit repository
+    repoBranch:
+        Type: String
+        Description: The Repository Branch to deploy
+    s3staticbucket:
+        Type: String
+        Description: The Name of bucket to host static website
+    AppPipeline:
+        Type: String
+        Description: Name of the pipeline
+
+Resources:
+    mypipeline:
+        Type: AWS::CodePipeline::Pipeline
+        Properties:
+            Name: !Ref AppPipeline
+            RoleArn: !Join ['', ['arn:aws:iam::', !Ref 'AWS::AccountId', ':role/service-role/', !Ref 'codepipelineRoleName']]
+            ArtifactStore:
+                Location: 
+                    Ref: artifactsBucket
+                Type: S3
+            
+            Stages:
+                -
+                    Name: Source
+                    Actions:
+                        -
+                            Name: SourceAction
+                            ActionTypeId:
+                                Category: Source
+                                Owner: AWS
+                                Provider: CodeCommit
+                                Version: 1 
+                            Configuration:
+                                RepositoryName:
+                                    Ref: codecommitrepo
+                                BranchName:
+                                    Ref: repoBranch
+                            OutputArtifacts:
+                                -
+                                    Name: sourceoutput
+                            RunOrder: 1
+                -
+                    Name: deploy-to-s3
+                    Actions:
+                        -
+                            Name: Deployaction
+                            ActionTypeId:
+                                Category: Deploy
+                                Owner: AWS
+                                Provider: S3
+                                Version: 1
+                            InputArtifacts:
+                                -
+                                    Name: sourceoutput
+                            Configuration:
+                                BucketName: !Ref s3staticbucket
+                                Extract: true
+                            RunOrder: 2
+
+    AmazonCloudWatchEventRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    -
+                        Effect: Allow
+                        Principal:
+                            Service:
+                                - events.amazonaws.com
+                        Action: sts:AssumeRole
+            Path: /
+            Policies:
+                -
+                    PolicyName: pipeline-execution
+                    PolicyDocument:
+                        Version: 2012-10-17
+                        Statement:
+                            -
+                                Effect: Allow
+                                Action: codepipeline:StartPipelineExecution
+                                Resource: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref AppPipeline ] ]
+
+    AmazonCloudWatchEventRule:
+        Type: AWS::Events::Rule
+        Properties:
+            EventPattern:
+                source:
+                    - aws.codecommit
+                detail-type:
+                    - 'CodeCommit Repository State Change'
+                resources:
+                    - !Join [ '', [ 'arn:aws:codecommit:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref codecommitrepo ] ]
+                detail:
+                    event:
+                        - referenceCreated
+                        - referenceUpdated
+                    referenceType:
+                        - branch
+                    referenceName:
+                        - !Ref repoBranch
+            Targets:
+                -
+                    Arn: 
+                        !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref AppPipeline ] ]
+                    RoleArn: !GetAtt AmazonCloudWatchEventRole.Arn
+                    Id: codepipeline-AppPipeline
